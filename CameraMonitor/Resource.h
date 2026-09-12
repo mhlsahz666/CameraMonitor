@@ -1,0 +1,63 @@
+﻿#pragma once
+
+// 对话框 ID
+#define IDD_SETTINGS_DIALOG  100
+#define IDD_SCRIPT_EDITOR    200
+
+// 主设置对话框控件
+#define IDC_TAB            2000
+#define IDC_LIST_CAM       2001
+#define IDC_BTN_REFRESH    2002
+#define IDC_LIST_START     2009
+#define IDC_LIST_STOP      2010
+#define IDC_BTN_ADD_START  2011
+#define IDC_BTN_DEL_START  2012
+#define IDC_BTN_ADD_STOP   2013
+#define IDC_BTN_DEL_STOP   2014
+#define IDC_BTN_EDIT_START 2015
+#define IDC_BTN_EDIT_STOP  2016
+#define IDC_LIST_TIMERANGE 2017
+#define IDC_BTN_ADD_RANGE  2018
+#define IDC_BTN_DEL_RANGE  2019
+#define IDC_CHK_AUTOSTART  2020
+#define IDC_BTN_SAVE       2021
+#define IDC_BTN_CANCEL     2022
+#define IDC_EDIT_STARTHH   2023
+#define IDC_EDIT_STARTMM   2024
+#define IDC_EDIT_ENDHH     2025
+#define IDC_EDIT_ENDMM     2026
+
+// 星期复选框
+#define IDC_CHK_DAY_SUN    2030
+#define IDC_CHK_DAY_MON    2031
+#define IDC_CHK_DAY_TUE    2032
+#define IDC_CHK_DAY_WED    2033
+#define IDC_CHK_DAY_THU    2034
+#define IDC_CHK_DAY_FRI    2035
+#define IDC_CHK_DAY_SAT    2036
+
+// 脚本编辑器控件
+#define IDC_COMBO_ACTION_TYPE  2100
+#define IDC_EDIT_PARAM1        2101
+#define IDC_EDIT_PARAM2        2102
+#define IDC_STATIC_PARAM1      2103
+#define IDC_STATIC_PARAM2      2104
+#define IDC_EDIT_REPEAT        2105
+#define IDC_STATIC_REPEAT      2106
+#define IDC_BTN_OK             2107
+#define IDC_BTN_CANCEL_SCRIPT  2108
+#define IDC_STATIC_HINT        2109
+
+#define IDC_STATIC_SOUNDWAIT   2110
+#define IDC_COMBO_SOUNDWAIT    2111
+
+#define IDC_BTN_UP_START   2040
+#define IDC_BTN_DOWN_START 2041
+#define IDC_BTN_UP_STOP    2042
+#define IDC_BTN_DOWN_STOP  2043
+#define IDC_BTN_RECORD_KEY     2112
+
+#define IDI_APP_ICON  101
+
+#define IDC_COMBO_SINGLE_KEY   2113
+#define IDC_STATIC_SINGLEKEY   2114
