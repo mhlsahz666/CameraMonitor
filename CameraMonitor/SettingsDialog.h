@@ -8,13 +8,30 @@
 #include <string>
 #include "ScriptEngine.h"
 #include "ScheduleManager.h"
+#include "AutoStart.h"
+#include "ScriptManager.h"
+#include "FileHeader.h"
 #include "resource.h"
 
 #pragma comment(lib, "comctl32.lib")
 
+struct AppSettings {
+    bool hideTrayIcon = false;
+    bool logToFile = false;
+    std::wstring logPath = L"D:\\CameraMonitor.log";
+    std::wstring hotkey = L"Control+Alt+C";
+    int volume = 50;
+    StorageType storage = StorageType::Registry;
+    std::wstring password;
+    std::wstring customTrayIconFile;   // 自定义托盘图标文件名（如 "custom.ico"）
+};
+
 class SettingsDialog {
 public:
     static INT_PTR Show(HINSTANCE hInst, HWND parent);
+    static AppSettings g_settings;
+    static ScriptManager g_scriptManager;
+
     static HWND s_hDlg;
     static HWND s_hTab;
     static std::vector<HWND> s_pageCtrls[3];
@@ -24,28 +41,17 @@ private:
     static void OnInit(HWND hDlg);
     static void OnTabChanged(HWND hDlg, int sel);
     static void OnSave(HWND hDlg);
-    static void OnRefreshCameras(HWND hDlg);
-    static void OnAddScript(HWND hDlg, bool isStart);
-    static void OnDelScript(HWND hDlg, bool isStart);
-    static void OnEditScript(HWND hDlg, bool isStart);
-    static void OnMoveScript(HWND hDlg, bool isStart, bool up);
-    static void OnAddRange(HWND hDlg);
-    static void OnDelRange(HWND hDlg);
-    static void LoadRangesToList(HWND hDlg);
-    static void LoadScriptsToList(HWND hDlg);
     static void ShowPage(HWND hDlg, int page);
 
-    static bool EditScriptAction(HWND parent, ScriptAction& action, bool isNew);
-    static INT_PTR CALLBACK ScriptEditorProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
-    static ScriptAction* s_editingAction;
+    static void OnInitSettingsPage(HWND hDlg);
+    static void OnInitScriptsPage(HWND hDlg);
+    static void OnInitTimerPage(HWND hDlg);
+    static void LoadScriptsToList(HWND hDlg);
+    static void LoadRangesToList(HWND hDlg);
 
-    // 键盘录制
-    static bool s_recording;
-    static HWND s_recordBtn;
-    static UINT_PTR s_recordTimer;
-    static std::wstring s_recordedKey;
-    static HWND s_recordDlg;
-    static void StartKeyRecord(HWND hDlg);
-    static void StopKeyRecord();
-    static std::wstring VkToName(DWORD vk);
+    static INT_PTR CALLBACK PasswordDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+    static INT_PTR CALLBACK PasswordInputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+    static bool CheckPassword(HWND parent);
+    static bool ExportConfig(const std::wstring& path);
+    static bool ImportConfig(const std::wstring& path);
 };

@@ -5,6 +5,10 @@
 #include <windows.h>
 #include <string>
 
+enum class StorageType { Registry, ExeDirectory };
+
+extern StorageType g_storageType;
+
 class AutoStart {
 public:
     static bool Enable(const std::wstring& appName, const std::wstring& exePath);
@@ -23,4 +27,13 @@ public:
     static std::wstring LoadString(const std::wstring& name, const std::wstring& defaultValue);
     static bool SaveBool(const std::wstring& name, bool value);
     static bool LoadBool(const std::wstring& name, bool defaultValue);
+
+    static std::wstring GetConfigFilePath();
+    static bool FileConfigExists();
+
+private:
+    static bool SaveToIni(const std::wstring& name, const std::wstring& value);
+    static std::wstring LoadFromIni(const std::wstring& name, const std::wstring& def);
+    static bool SaveToRegistry(const std::wstring& name, const std::wstring& value, bool isString);
+    static std::wstring LoadFromRegistry(const std::wstring& name, const std::wstring& def, bool isString);
 };

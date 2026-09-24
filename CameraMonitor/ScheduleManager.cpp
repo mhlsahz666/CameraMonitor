@@ -55,14 +55,19 @@ void ScheduleManager::CheckTime()
 
 bool ScheduleManager::IsInAllowedTime() const
 {
-    // 没有设置任何退出时间段，始终运行
-    if (m_ranges.empty()) return true;
+    for (const auto& r : m_ranges) {
+        if (!r.enabled) continue;
+        // 只要有一条启用，就认为需要检查
+        goto HAS_ENABLED;
+    }
+    return true;
 
+HAS_ENABLED:
     time_t now = time(nullptr);
     tm local;
     localtime_s(&local, &now);
     int curMinutes = local.tm_hour * 60 + local.tm_min;
-    int curDay = local.tm_wday;  // 0=周日
+    int curDay = local.tm_wday;
 
     for (const auto& r : m_ranges) {
         if (!r.enabled) continue;
@@ -76,11 +81,8 @@ bool ScheduleManager::IsInAllowedTime() const
             inRange = (curMinutes >= startMin && curMinutes < endMin);
         }
         else {
-            // 跨天，例如 22:00 - 06:00
             inRange = (curMinutes >= startMin || curMinutes < endMin);
         }
-
-        // 命中任意一个退出时间段 → 不允许运行
         if (inRange) return false;
     }
     return true;

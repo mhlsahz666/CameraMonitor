@@ -3,16 +3,20 @@
 #include <shellapi.h>
 #include <mmsystem.h>
 #include <shlobj.h>
+#include <sstream>
 #include <thread>
 #include <chrono>
-#include <fstream>
-#include <sstream>
 
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "shell32.lib")
 
 extern NOTIFYICONDATAW g_nid;
 extern HWND            g_hwnd;
+
+// 由 main.cpp 维护：当前占用摄像头的进程名
+extern std::wstring g_currentOccupiedProcess;
+extern std::wstring g_currentOccupiedCamera;
+extern bool g_cameraInUse;
 
 ScriptEngine::ScriptEngine()
 {
@@ -56,12 +60,41 @@ void ScriptEngine::TriggerEvent(ScriptEvent evt)
 void ScriptEngine::ExecuteActions(const std::vector<ScriptAction>& actions)
 {
     for (const auto& action : actions) {
+        if (!action.enabled) continue;
         ExecuteAction(action);
     }
 }
 
+// ======================== 条件求值（用于 BlockIf）========================
+static bool EvaluateCondition(const std::wstring& left, LogicalOp op,
+    const std::wstring& right)
+{
+    switch (op) {
+    case LogicalOp::Equal:
+        return left == right;
+    case LogicalOp::NotEqual:
+        return left != right;
+    case LogicalOp::Greater: {
+        int a = _wtoi(left.c_str());
+        int b = _wtoi(right.c_str());
+        return a > b;
+    }
+    case LogicalOp::Less: {
+        int a = _wtoi(left.c_str());
+        int b = _wtoi(right.c_str());
+        return a < b;
+    }
+    case LogicalOp::Contains:
+        return left.find(right) != std::wstring::npos;
+    }
+    return false;
+}
+
+// ======================== 执行动作 ========================
 void ScriptEngine::ExecuteAction(const ScriptAction& action)
 {
+    if (!action.enabled) return;
+
     switch (action.type)
     {
     case ScriptActionType::RunCmd:
@@ -85,25 +118,94 @@ void ScriptEngine::ExecuteAction(const ScriptAction& action)
         break;
 
     case ScriptActionType::Wait:
-        Sleep(action.delay);
-        break;
+    {
+        int ms = _wtoi(action.param1.c_str());
+        if (ms > 0) Sleep(ms);
+    }
+    break;
 
-    case ScriptActionType::Repeat:
-        for (int i = 0; i < action.repeatCount; i++) {
-            ExecuteActions(action.children);
-        }
-        break;
-
-    case ScriptActionType::IfCameraInUse:
-        ExecuteActions(action.children);
+    case ScriptActionType::RandomNumber:
+        ExecuteRandomNumber(action);
         break;
 
     case ScriptActionType::ExitProgram:
         PostMessage(g_hwnd, WM_CLOSE, 0, 0);
         break;
+
+        // ==================== 块 ====================
+    case ScriptActionType::BlockEventCameraStart:
+    case ScriptActionType::BlockEventCameraStop:
+        // 事件块本身就是顶层触发，直接执行子动作
+        ExecuteActions(action.children);
+        break;
+
+    case ScriptActionType::BlockIfCameraOccupied:
+    {
+        // param1 为空 → 只要有摄像头被占用就执行
+        // param1 非空 → 用“包含”匹配 g_currentOccupiedCamera
+        if (g_cameraInUse) {
+            if (action.param1.empty() ||
+                g_currentOccupiedCamera.find(action.param1) != std::wstring::npos) {
+                ExecuteActions(action.children);
+            }
+        }
+    }
+    break;
+
+    case ScriptActionType::BlockIfProcessOccupied:
+        // 如果 xx 程序占用：比较 g_currentOccupiedProcess 和 param1
+    {
+        if (EvaluateCondition(g_currentOccupiedProcess,
+            LogicalOp::Contains, action.param1)) {
+            ExecuteActions(action.children);
+        }
+    }
+    break;
+
+    case ScriptActionType::BlockIfRandom:
+    {
+        int r = rand() % 100 + 1;
+        if (r > 50) ExecuteActions(action.children);
+    }
+    break;
+
+    case ScriptActionType::BlockRepeat:
+    {
+        int count = action.repeatCount > 0 ? action.repeatCount : 1;
+        for (int i = 0; i < count; i++)
+            ExecuteActions(action.children);
+    }
+    break;
+
+    case ScriptActionType::BlockIf:
+    {
+        // param1 = 变量名，param2 = 比较值
+        // 变量名约定："进程名"、"摄像头名"、"随机数"
+        std::wstring leftValue;
+        if (action.param1 == L"进程名") {
+            leftValue = g_currentOccupiedProcess;
+        }
+        else if (action.param1 == L"摄像头名") {
+            leftValue = L"";  // TODO：如需摄像头名，扩展全局变量
+        }
+        else if (action.param1 == L"随机数") {
+            wchar_t buf[16];
+            swprintf_s(buf, L"%d", rand() % 100);
+            leftValue = buf;
+        }
+        else {
+            leftValue = action.param1;  // 直接当字面量
+        }
+
+        if (EvaluateCondition(leftValue, action.logicalOp, action.param2)) {
+            ExecuteActions(action.children);
+        }
+    }
+    break;
     }
 }
 
+// ======================== 普通动作实现 ========================
 void ScriptEngine::ExecuteRunCmd(const std::wstring& cmd)
 {
     if (cmd.empty()) return;
@@ -128,15 +230,10 @@ void ScriptEngine::ExecuteRunCmd(const std::wstring& cmd)
 void ScriptEngine::ExecutePlaySound(const std::wstring& path, bool wait)
 {
     if (path.empty()) return;
-
-    if (wait) {
-        // 等待播放完毕：SND_SYNC 会阻塞直到声音播放结束
+    if (wait)
         PlaySoundW(path.c_str(), NULL, SND_FILENAME | SND_SYNC);
-    }
-    else {
-        // 不等待：SND_ASYNC 立即返回，声音在后台播放
+    else
         PlaySoundW(path.c_str(), NULL, SND_FILENAME | SND_ASYNC);
-    }
 }
 
 void ScriptEngine::ExecuteSimulateKey(const std::wstring& key)
@@ -172,6 +269,33 @@ void ScriptEngine::ExecuteSimulateKey(const std::wstring& key)
         else if (token == L"ESC")   keys.push_back(VK_ESCAPE);
         else if (token == L"TAB")   keys.push_back(VK_TAB);
         else if (token == L"SPACE") keys.push_back(VK_SPACE);
+        else if (token == L"BACK")  keys.push_back(VK_BACK);
+        else if (token == L"DELETE") keys.push_back(VK_DELETE);
+        else if (token == L"UP")    keys.push_back(VK_UP);
+        else if (token == L"DOWN")  keys.push_back(VK_DOWN);
+        else if (token == L"LEFT")  keys.push_back(VK_LEFT);
+        else if (token == L"RIGHT") keys.push_back(VK_RIGHT);
+        else if (token == L"INSERT") keys.push_back(VK_INSERT);
+        else if (token == L"HOME")  keys.push_back(VK_HOME);
+        else if (token == L"END")   keys.push_back(VK_END);
+        else if (token == L"PGUP")  keys.push_back(VK_PRIOR);
+        else if (token == L"PGDN")  keys.push_back(VK_NEXT);
+        else if (token == L"CAPSLOCK") keys.push_back(VK_CAPITAL);
+        else if (token == L"NUMLOCK") keys.push_back(VK_NUMLOCK);
+        else if (token == L"SCROLLLOCK") keys.push_back(VK_SCROLL);
+        else if (token == L"PRINTSCREEN") keys.push_back(VK_SNAPSHOT);
+        else if (token == L"NUM0") keys.push_back(VK_NUMPAD0);
+        else if (token == L"NUM1") keys.push_back(VK_NUMPAD1);
+        else if (token == L"NUM2") keys.push_back(VK_NUMPAD2);
+        else if (token == L"NUM3") keys.push_back(VK_NUMPAD3);
+        else if (token == L"NUM4") keys.push_back(VK_NUMPAD4);
+        else if (token == L"NUM5") keys.push_back(VK_NUMPAD5);
+        else if (token == L"NUM6") keys.push_back(VK_NUMPAD6);
+        else if (token == L"NUM7") keys.push_back(VK_NUMPAD7);
+        else if (token == L"NUM8") keys.push_back(VK_NUMPAD8);
+        else if (token == L"NUM9") keys.push_back(VK_NUMPAD9);
+        else if (token.size() == 6 && token.substr(0, 3) == L"VK_")
+            keys.push_back((WORD)wcstoul(token.substr(3).c_str(), nullptr, 16));
     }
 
     if (keys.empty()) return;
@@ -194,4 +318,12 @@ void ScriptEngine::ExecuteCustomNotify(const std::wstring& title, const std::wst
     wcscpy_s(g_nid.szInfo, text.c_str());
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
     g_nid.uFlags = 0;
+}
+
+void ScriptEngine::ExecuteRandomNumber(const ScriptAction& action)
+{
+    int r = rand() % (action.randomMax - action.randomMin + 1) + action.randomMin;
+    wchar_t buf[64];
+    swprintf_s(buf, L"随机数：%d", r);
+    ExecuteCustomNotify(L"随机数", buf);
 }

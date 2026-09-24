@@ -6,25 +6,49 @@
 #include <string>
 #include <vector>
 
+// ======================== 逻辑运算符 ========================
+enum class LogicalOp {
+    Equal,        // 等于
+    NotEqual,     // 不等于
+    Greater,      // 大于
+    Less,         // 小于
+    Contains,     // 包含
+};
+
+// ======================== 动作类型 ========================
 enum class ScriptActionType {
+    // ===== 普通动作 =====
     RunCmd,
     PlaySoundAction,
     SimulateKey,
     CreateWindow,
     CustomNotify,
     Wait,
-    Repeat,
-    IfCameraInUse,
-    ExitProgram
+    RandomNumber,
+    ExitProgram,
+
+    // ===== 块 =====
+    BlockEventCameraStart,      // 当摄像头被占用
+    BlockEventCameraStop,       // 当摄像头停止占用
+    BlockIfCameraOccupied,      // 如果 xx 摄像头被占用
+    BlockIfProcessOccupied,     // 如果 xx 程序占用
+    BlockIfRandom,              // 如果随机数 > 50
+    BlockRepeat,                // 重复执行
+    BlockIf,                    // 如果（通用条件）
 };
 
+// ======================== 动作结构 ========================
 struct ScriptAction {
     ScriptActionType type;
     std::wstring param1;
     std::wstring param2;
     int delay = 0;
     int repeatCount = 1;
-    int soundWait = 0;   // ← 新增：0=不等待，1=等待播放完毕
+    int soundWait = 0;
+    int randomMin = 0;
+    int randomMax = 100;
+    LogicalOp logicalOp = LogicalOp::Equal;  // 逻辑运算符（用于 BlockIf）
+    bool enabled = true;
     std::vector<ScriptAction> children;
 };
 
@@ -33,6 +57,22 @@ enum class ScriptEvent {
     CameraStop
 };
 
+// ======================== 判断是否为块 ========================
+inline bool IsBlockAction(ScriptActionType t) {
+    switch (t) {
+    case ScriptActionType::BlockEventCameraStart:
+    case ScriptActionType::BlockEventCameraStop:
+    case ScriptActionType::BlockIfCameraOccupied:
+    case ScriptActionType::BlockIfProcessOccupied:
+    case ScriptActionType::BlockIfRandom:
+    case ScriptActionType::BlockRepeat:
+    case ScriptActionType::BlockIf:
+        return true;
+    }
+    return false;
+}
+
+// ======================== 脚本引擎 ========================
 class ScriptEngine {
 public:
     ScriptEngine();
@@ -54,4 +94,5 @@ private:
     void ExecuteSimulateKey(const std::wstring& key);
     void ExecuteCreateWindow(const std::wstring& title, const std::wstring& text);
     void ExecuteCustomNotify(const std::wstring& title, const std::wstring& text);
+    void ExecuteRandomNumber(const ScriptAction& action);
 };

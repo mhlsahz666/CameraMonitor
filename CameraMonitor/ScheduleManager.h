@@ -10,7 +10,7 @@ struct TimeRange {
     int startMinute = 0;
     int endHour = 22;
     int endMinute = 0;
-    bool enabled = true;
+    bool enabled = false;
     bool days[7] = { true, true, true, true, true, true, true };
 };
 
